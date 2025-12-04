@@ -48,6 +48,9 @@ contract ClearNet is Ownable, ReentrancyGuard {
     address[] public activeNodeIds;
     mapping(address => uint256) private activeNodeIndex; // index in activeNodeIds array
 
+    address[] public activeChannelIds;
+    mapping(address => uint256) private activeChannelIndex; // index in activeChannelIds array
+
     // Protocol fee distribution (85-10-5)
     uint256 public constant NODE_SHARE = 850;           // 85.0%
     uint256 public constant TREASURY_SHARE = 100;       // 10.0%
@@ -241,6 +244,10 @@ contract ClearNet is Ownable, ReentrancyGuard {
         channel.nonce = 0;
         channel.isActive = true;
 
+        // Add to active channels
+        activeChannelIndex[msg.sender] = activeChannelIds.length;
+        activeChannelIds.push(msg.sender);
+
         emit PaymentChannelOpened(msg.sender, _amount);
     }
 
@@ -361,6 +368,9 @@ contract ClearNet is Ownable, ReentrancyGuard {
         uint256 refundAmount = channel.balance;
         channel.balance = 0;        // Prevent re-entrancy
         channel.isActive = false;   // Mark channel as closed
+
+        // Remove from active channels
+        _removeFromActiveChannels(msg.sender);
 
         // Refund remaining balance to client
         if (refundAmount > 0) {
@@ -557,6 +567,41 @@ contract ClearNet is Ownable, ReentrancyGuard {
         return (nodes, total);
     }
 
+    /// @notice Get all active payment channels
+    /// @return channels Array of client addresses with active channels
+    function getActivePaymentChannels() external view returns (address[] memory) {
+        return activeChannelIds;
+    }
+
+    /// @notice Get paginated list of active payment channels
+    /// @param _offset Starting index
+    /// @param _limit Number of channels to return
+    /// @return channels Array of client addresses
+    /// @return total Total number of active channels
+    function getActivePaymentChannelsPaginated(uint256 _offset, uint256 _limit) external view returns (
+        address[] memory channels,
+        uint256 total
+    ) {
+        total = activeChannelIds.length;
+        if (_offset >= total) {
+            return (new address[](0), total);
+        }
+
+        uint256 end = _offset + _limit;
+        if (end > total) {
+            end = total;
+        }
+
+        uint256 resultLength = end - _offset;
+        channels = new address[](resultLength);
+
+        for (uint256 i = 0; i < resultLength; i++) {
+            channels[i] = activeChannelIds[_offset + i];
+        }
+
+        return (channels, total);
+    }
+
     // ========== EMERGENCY CONTROLS ==========
     
     /// @notice Pause the contract
@@ -622,6 +667,22 @@ contract ClearNet is Ownable, ReentrancyGuard {
         
         activeNodeIds.pop();
         delete activeNodeIndex[_nodeID];
+    }
+
+    /// @notice Remove channel from active channels array efficiently (O(1))
+    /// @param _client Client address to remove
+    function _removeFromActiveChannels(address _client) internal {
+        uint256 index = activeChannelIndex[_client];
+        uint256 lastIndex = activeChannelIds.length - 1;
+        
+        if (index != lastIndex) {
+            address lastClient = activeChannelIds[lastIndex];
+            activeChannelIds[index] = lastClient;
+            activeChannelIndex[lastClient] = index;
+        }
+        
+        activeChannelIds.pop();
+        delete activeChannelIndex[_client];
     }
     
     function min(uint256 a, uint256 b) internal pure returns (uint256) {

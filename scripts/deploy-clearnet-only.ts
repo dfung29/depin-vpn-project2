@@ -16,16 +16,19 @@ async function main() {
     throw new Error("Missing SEPOLIA_RPC_URL or SEPOLIA_PRIVATE_KEY in .env");
   }
 
-  // Check if contracts already deployed
+  // Use existing CLRToken address
+  const clrTokenAddress = "0xf1664c17887767c8f58695846babb349ca61d2e9";
+  console.log("Using existing CLRToken at:", clrTokenAddress);
+
+  // Check if ClearNet already deployed
   const deploymentFile = path.join(__dirname, "../.deployments.json");
   if (fs.existsSync(deploymentFile)) {
     const deployments = JSON.parse(fs.readFileSync(deploymentFile, "utf-8"));
-    console.log("\n⚠️  Existing deployments found:");
-    console.log("CLRToken:", deployments.clrToken);
+    console.log("\n⚠️  Existing ClearNet deployment found:");
     console.log("ClearNet:", deployments.clearNet);
     console.log("\n❌ Aborting deployment to prevent overwriting!\n");
-    console.log("If you want to redeploy, delete .deployments.json first:");
-    console.log("  rm .deployments.json\n");
+    console.log("If you want to redeploy ClearNet, delete .deployments.json first:");
+    console.log("  del .deployments.json\n");
     process.exitCode = 1;
     return;
   }
@@ -35,21 +38,11 @@ async function main() {
   const deployer = createWalletClient({ account, chain, transport: http(rpcUrl) });
   const publicClient = createPublicClient({ chain, transport: http(rpcUrl) });
 
-  // Read artifacts
-  const clrArtifact = await hre.artifacts.readArtifact("CLRToken");
+  // Read ClearNet artifact
   const clearNetArtifact = await hre.artifacts.readArtifact("ClearNet");
 
-  // Deploy CLRToken
-  const clrTokenHash = await deployer.deployContract({
-    abi: clrArtifact.abi,
-    bytecode: clrArtifact.bytecode,
-    args: [],
-  });
-  const clrReceipt = await publicClient.waitForTransactionReceipt({ hash: clrTokenHash });
-  const clrTokenAddress = clrReceipt.contractAddress!;
-  console.log("✅ CLRToken deployed to:", clrTokenAddress);
-
-  // Deploy ClearNet with CLRToken address
+  // Deploy ClearNet with existing CLRToken address
+  console.log("\nDeploying ClearNet with updated payment channel tracking...");
   const clearNetHash = await deployer.deployContract({
     abi: clearNetArtifact.abi,
     bytecode: clearNetArtifact.bytecode,
@@ -66,11 +59,15 @@ async function main() {
     deploymentTime: new Date().toISOString(),
     network: "sepolia",
     deployedBy: account.address,
+    note: "ClearNet redeployed with payment channel tracking, using existing CLRToken",
   };
 
   fs.writeFileSync(deploymentFile, JSON.stringify(deploymentData, null, 2));
-  console.log("\n✅ Deployment addresses saved to .deployments.json");
-  console.log("To redeploy, delete .deployments.json first");
+  console.log("\n✅ Deployment address saved to .deployments.json");
+  console.log("✅ Your existing CLR token balance is still available!");
+  console.log("\nNext steps:");
+  console.log("1. Update other scripts (register-node.ts, etc.) to use new ClearNet address");
+  console.log("2. You can now use getActivePaymentChannels() to view open channels");
 }
 
 main().catch((error) => {
