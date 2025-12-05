@@ -417,6 +417,8 @@ contract ClearNet is Ownable, ReentrancyGuard {
         // Treasury share remains in contract for governance use
         clrToken.safeTransfer(owner(), ownerShare);     // 5.0% to contract owner (maintenance)
 
+        emit OwnerShareAccrued(owner(), ownerShare);
+
         emit PaymentProcessed(
             _client, 
             _node, 
