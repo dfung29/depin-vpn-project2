@@ -20,10 +20,10 @@ contract ClearNet is Ownable, ReentrancyGuard {
         uint16 port;                // Port number of the node
         bool isActive;
         uint256 stakeAmount;
-        uint256 reputationScore;    // Reputation score scaled by REPUTATION_PRECISION (0-5000 = 0.000-5.000)
+        uint256 reputationScore;    // Reputation score scaled by 1000 (0-5000 = 0.000-5.000)
         uint256 pricePerMinute;     // Price in CLR tokens per minute
         uint256 totalMinutesServed;
-        uint256 totalEarnings;
+        uint256 totalEarnings;      // Total earnings received by node (90% share)
         uint256 lastActivity;
         uint256 totalRatingValue;   // Sum of all provided ratings (scaled by 1000)
         uint256 totalRatingCount;   // Number of ratings provided
@@ -66,7 +66,7 @@ contract ClearNet is Ownable, ReentrancyGuard {
     uint256 public constant MAX_MINUTES_PER_PAYMENT = 10080;        // 1 week max
     uint256 public constant ABORT_WINDOW = 120;                     // 2 minutes abort window
     
-    // Reputation system (scaled by 1000 for 3 decimal precision)
+    // Reputation system (scaled by 1000 for 3 decimal places: 0.000-5.000)
     uint256 public constant INITIAL_REPUTATION = 3000;          // 3.000
     uint256 public constant MAX_REPUTATION = 5000;              // 5.000
     
@@ -107,6 +107,7 @@ contract ClearNet is Ownable, ReentrancyGuard {
         bool ratingProvided,
         uint256 rating
     );
+    event OwnerShareAccrued(address indexed ownerAccount, uint256 amount);
     event PaymentChannelClosed(address indexed client, uint256 refundAmount);
     event ConnectionAborted(address indexed client, uint256 connectionStartTime, uint256 abortTime);
     event Paused(address indexed account);
@@ -130,7 +131,7 @@ contract ClearNet is Ownable, ReentrancyGuard {
 
     // ========== CONSTRUCTOR ==========
 
-    constructor(address _clrToken) Ownable(msg.sender) {     // If using OpenZeppelin v4, remove (msg.sender) from Ownable(...)
+    constructor(address _clrToken) Ownable(msg.sender) {
         require(_clrToken != address(0), "Invalid CLR token address");
         clrToken = IERC20(_clrToken);
     }
@@ -479,7 +480,7 @@ contract ClearNet is Ownable, ReentrancyGuard {
 
         usedSignatures[ethSignedMessageHash] = true;
 
-        // Increment nonce without charging
+        // Increment nonce to invalidate any pending signatures for this connection
         channel.nonce++;
 
         emit ConnectionAborted(_client, _connectionStartTime, block.timestamp);
