@@ -69,8 +69,6 @@ contract ClearNet is Ownable, ReentrancyGuard {
     // Reputation system (scaled by 1000 for 3 decimal precision)
     uint256 public constant INITIAL_REPUTATION = 3000;          // 3.000
     uint256 public constant MAX_REPUTATION = 5000;              // 5.000
-    uint256 public constant REPUTATION_INCREMENT = 1;           // 0.001 per successful session
-    uint256 public constant REPUTATION_DECREMENT = 10;          // 0.010 per failed session
     
     // Protocol statistics
     uint256 public totalBandwidthMinutes;  // Total bandwidth minutes served
@@ -533,34 +531,8 @@ contract ClearNet is Ownable, ReentrancyGuard {
         clrToken.safeTransfer(governanceContract, _amount);
     }
 
-    // ========== REPUTATION MANAGEMENT ==========
+    // ========== SLASHING & PENALTIES ==========
     
-    /// @notice Update node reputation based on session success
-    /// @param _nodeID Node address
-    /// @param _successfulSession Whether the session was successful
-    function updateReputation(
-      address _nodeID, 
-      bool _successfulSession
-    ) external onlyOwner {
-        Node storage node = nodes[_nodeID];
-        require(node.isActive, "Node not active");
-
-        if (_successfulSession) {
-            // Increase reputation for successful session (0.001)
-            node.reputationScore = min(node.reputationScore + REPUTATION_INCREMENT, MAX_REPUTATION);
-        } else {
-            // Decrease reputation for failed session (0.010)
-            if (node.reputationScore >= REPUTATION_DECREMENT) {
-                node.reputationScore -= REPUTATION_DECREMENT;
-            } else {
-                node.reputationScore = 0;
-            }
-        } 
-
-        node.lastActivity = block.timestamp;
-        emit ReputationUpdated(_nodeID, node.reputationScore);
-    } 
-
     /// @notice Slash a node's stake for misbehavior
     /// @param _nodeID Node address
     /// @param _slashAmount Amount to slash
