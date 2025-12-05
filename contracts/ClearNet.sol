@@ -25,6 +25,8 @@ contract ClearNet is Ownable, ReentrancyGuard {
         uint256 totalMinutesServed;
         uint256 totalEarnings;
         uint256 lastActivity;
+        uint256 totalRatingValue;   // Sum of all provided ratings (scaled by 1000)
+        uint256 totalRatingCount;   // Number of ratings provided
     }
     
     // Payment channel for users
@@ -164,7 +166,9 @@ contract ClearNet is Ownable, ReentrancyGuard {
             pricePerMinute: _pricePerMinute,
             totalMinutesServed: 0,
             totalEarnings: 0,
-            lastActivity: block.timestamp
+            lastActivity: block.timestamp,
+            totalRatingValue: 0,
+            totalRatingCount: 0
         });
 
         activeNodeIndex[msg.sender] = activeNodeIds.length;
@@ -373,23 +377,34 @@ contract ClearNet is Ownable, ReentrancyGuard {
         node.totalEarnings += nodeShare;
         
         // Update reputation based on rating (weighted by connection duration)
-        // Formula: reputationDelta = (rating - 3.0) * durationWeight * REPUTATION_PRECISION
-        // where durationWeight = min(minutesUsed / 60, 1.0)
-        // This means longer connections have more impact on reputation
+        // Formula: reputationDelta = (rating - currentReputation) * durationWeight
+        // - currentReputation is already scaled by REPUTATION_PRECISION (0-5000)
+        // - rating is scaled to 0-5000 via rating * 1000
+        // durationWeight = min(minutesUsed / 60, 1.0)
+        // This nudges reputation toward the latest rating, with longer sessions having more impact
+        // Final reputation remains capped by the running average of all ratings provided
         if (_ratingProvided) {
             // Calculate duration weight (capped at 60 minutes = 1.0)
             uint256 durationWeight = minutesUsed >= 60 ? 1000 : (minutesUsed * 1000) / 60;
             
-            // Map rating (0-5) to delta (-3.0 to +2.0)
-            // rating=0: delta=-3000, rating=3.0: delta=0, rating=5: delta=2000 (scaled)
-            int256 ratingDelta = int256(_rating) * 500 - 1500; // (rating * 500 - 1500)
+            // Convert rating (0-5) to scaled (0-5000) and compare to current reputation
+            int256 ratingScaled = int256(_rating) * 1000; // 0 to 5000
+            int256 ratingDelta = ratingScaled - int256(node.reputationScore);
             
             // Apply duration weight: delta = ratingDelta * durationWeight / 1000
             int256 weightedDelta = (ratingDelta * int256(durationWeight)) / 1000;
             
             // Apply to reputation with bounds checking
             int256 newReputation = int256(node.reputationScore) + weightedDelta;
-            node.reputationScore = _clampReputation(newReputation);
+            uint256 clampedReputation = _clampReputation(newReputation);
+
+            // Update rating aggregates (scaled by 1000)
+            node.totalRatingValue += _rating * 1000;
+            node.totalRatingCount += 1;
+
+            // Compute average rating (scaled by 1000) and cap reputation to this average
+            uint256 averageRatingScaled = node.totalRatingValue / node.totalRatingCount;
+            node.reputationScore = min(clampedReputation, averageRatingScaled);
         }
         // If no rating provided: reputation stays unchanged
         
