@@ -49,9 +49,10 @@ contract ClearNet is Ownable, ReentrancyGuard {
     address[] public activeChannelIds;
     mapping(address => uint256) private activeChannelIndex; // index in activeChannelIds array
 
-    // Protocol fee distribution (90-10)
+    // Protocol fee distribution (90-5-5)
     uint256 public constant NODE_SHARE = 900;           // 90.0%
-    uint256 public constant TREASURY_SHARE = 100;       // 10.0%
+    uint256 public constant TREASURY_SHARE = 50;        // 5.0%
+    uint256 public constant OWNER_SHARE = 50;           // 5.0%
     uint256 public constant SHARE_DENOMINATOR = 1000;   // Denominator for fee percentages
 
     // Node requirements
@@ -102,6 +103,7 @@ contract ClearNet is Ownable, ReentrancyGuard {
         uint256 minutesUsed,
         uint256 nodeShare,
         uint256 treasuryShare,
+        uint256 ownerShare,
         bool ratingProvided,
         uint256 rating
     );
@@ -361,9 +363,10 @@ contract ClearNet is Ownable, ReentrancyGuard {
         channel.balance -= totalCost;
         channel.nonce++;
 
-        // Calculate distribution (90-10, with remainder going to treasury)
+        // Calculate distribution (90-5-5, with remainder going to owner)
         uint256 nodeShare = (totalCost * NODE_SHARE) / SHARE_DENOMINATOR;
-        uint256 treasuryShare = totalCost - nodeShare; // Ensures all funds are accounted for
+        uint256 treasuryShare = (totalCost * TREASURY_SHARE) / SHARE_DENOMINATOR;
+        uint256 ownerShare = totalCost - nodeShare - treasuryShare; // Remainder to owner
 
         // Update node statistics
         node.totalMinutesServed += minutesUsed;
@@ -399,6 +402,7 @@ contract ClearNet is Ownable, ReentrancyGuard {
         // Transfer funds
         clrToken.safeTransfer(_node, nodeShare);        // 90.0% to node
         // Treasury share remains in contract for governance use
+        clrToken.safeTransfer(owner(), ownerShare);     // 5.0% to contract owner (maintenance)
 
         emit PaymentProcessed(
             _client, 
@@ -407,6 +411,7 @@ contract ClearNet is Ownable, ReentrancyGuard {
             minutesUsed,
             nodeShare,
             treasuryShare,
+            ownerShare,
             _ratingProvided,
             _ratingProvided ? _rating : 0
         );
