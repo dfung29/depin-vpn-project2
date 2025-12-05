@@ -25,7 +25,7 @@ async function main() {
   const clearNetArtifact = await hre.artifacts.readArtifact("ClearNet");
 
   const clrAddress = "0xf1664c17887767c8f58695846babb349ca61d2e9" as `0x${string}`;
-  const clearNetAddress = "0xf04cbb756045b276ea962ea98d938a0ed8101f51" as `0x${string}`;
+  const clearNetAddress = "0xb6f537b38b82d08ff3ed796754d9d85b5cfe9cb5" as `0x${string}`;
 
   // Node registration parameters
   const ipAddress = "192.168.1.100";

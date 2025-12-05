@@ -34,7 +34,6 @@ contract ClearNet is Ownable, ReentrancyGuard {
         bool isActive;
     }   
 
-
     // ========== STATE VARIABLES ==========
 
     IERC20 public clrToken;
@@ -43,7 +42,6 @@ contract ClearNet is Ownable, ReentrancyGuard {
     mapping(address => Node) public nodes;
     mapping(address => PaymentChannel) public paymentChannels;
     mapping(bytes32 => bool) public usedSignatures; // To prevent replay attacks
-    mapping(address => bool) public relayOperators; // Authorized relays nodes
 
     address[] public activeNodeIds;
     mapping(address => uint256) private activeNodeIndex; // index in activeNodeIds array
@@ -51,22 +49,21 @@ contract ClearNet is Ownable, ReentrancyGuard {
     address[] public activeChannelIds;
     mapping(address => uint256) private activeChannelIndex; // index in activeChannelIds array
 
-    // Protocol fee distribution (85-10-5)
-    uint256 public constant NODE_SHARE = 850;           // 85.0%
+    // Protocol fee distribution (90-10)
+    uint256 public constant NODE_SHARE = 900;           // 90.0%
     uint256 public constant TREASURY_SHARE = 100;       // 10.0%
-    uint256 public constant RELAY_SHARE = 50;           // 5.0%
     uint256 public constant SHARE_DENOMINATOR = 1000;   // Denominator for fee percentages
 
     // Node requirements
-    uint256 public constant MIN_STAKE = 1000 * 10**18;          // 1000 CLR tokens
-    uint256 public constant MIN_PRICE_PER_MIN = 1 * 10**16;     // 0.01 CLR tokens minimum
-    uint256 public constant MAX_PRICE_PER_MIN = 100 * 10**18;   // 100 CLR tokens minimum
-    uint256 public constant MIN_STAKE_THRESHOLD = MIN_STAKE / 2; // Minimum stake before deregistration
-    uint256 public constant MIN_CHANNEL_BALANCE = 10 * 10**18;  // 10 CLR minimum
-    uint256 public constant MAX_MINUTES_PER_PAYMENT = 10080;     // 1 week max
+    uint256 public constant MIN_STAKE = 1000 * 10**18;              // 1000 CLR tokens
+    uint256 public constant MIN_PRICE_PER_MIN = 1 * 10**16;         // 0.01 CLR tokens minimum
+    uint256 public constant MAX_PRICE_PER_MIN = 100 * 10**18;       // 100 CLR tokens minimum
+    uint256 public constant MIN_STAKE_THRESHOLD = MIN_STAKE / 2;    // Minimum stake before deregistration
+    uint256 public constant MIN_CHANNEL_BALANCE = 10 * 10**18;      // 10 CLR minimum
+    uint256 public constant MAX_MINUTES_PER_PAYMENT = 10080;        // 1 week max
+    uint256 public constant ABORT_WINDOW = 120;                     // 2 minutes abort window
     
     // Reputation system (scaled by 1000 for 3 decimal precision)
-    uint256 public constant REPUTATION_PRECISION = 1000;
     uint256 public constant INITIAL_REPUTATION = 3000;          // 3.000
     uint256 public constant MAX_REPUTATION = 5000;              // 5.000
     uint256 public constant REPUTATION_INCREMENT = 1;           // 0.001 per successful session
@@ -105,11 +102,11 @@ contract ClearNet is Ownable, ReentrancyGuard {
         uint256 minutesUsed,
         uint256 nodeShare,
         uint256 treasuryShare,
-        uint256 relayShare
+        bool ratingProvided,
+        uint256 rating
     );
     event PaymentChannelClosed(address indexed client, uint256 refundAmount);
-    event RelayOperatorAdded(address indexed relay);
-    event RelayOperatorRemoved(address indexed relay);
+    event ConnectionAborted(address indexed client, uint256 connectionStartTime, uint256 abortTime);
     event Paused(address indexed account);
     event Unpaused(address indexed account);
     event GovernanceTransferInitiated(address indexed currentGovernance, address indexed pendingGovernance);
@@ -121,11 +118,6 @@ contract ClearNet is Ownable, ReentrancyGuard {
     modifier onlyGovernance() {
         require(governanceContract != address(0), "Governance not set");
         require(msg.sender == governanceContract, "Only governance can call");
-        _;
-    }
-
-    modifier onlyRelay() {
-        require(relayOperators[msg.sender], "Only authorized relays can call");
         _;
     }
 
@@ -187,7 +179,7 @@ contract ClearNet is Ownable, ReentrancyGuard {
     function updateNodeInfo(
         string calldata _newIpAddress, 
         uint16 _newPort
-    ) external {
+    ) external whenNotPaused {
         Node storage node = nodes[msg.sender];
         require(node.isActive, "Node not registered");
         require(bytes(_newIpAddress).length > 0, "IP address required");
@@ -201,23 +193,27 @@ contract ClearNet is Ownable, ReentrancyGuard {
     }
 
     /// @notice Deregister a node and return stake
-    function deregisterNode() external nonReentrant {
+    function deregisterNode() external nonReentrant whenNotPaused {
         Node storage node = nodes[msg.sender];
         require(node.isActive, "Node not registered");
 
         uint256 returnedStake = node.stakeAmount;
+        
+        _removeFromActiveNodes(msg.sender);
+        
+        // Update state before external call 
         node.isActive = false;
         node.stakeAmount = 0;
 
-        _removeFromActiveNodes(msg.sender);
-
         // Return stake to node operator
-        clrToken.safeTransfer(msg.sender, returnedStake);
+        if (returnedStake > 0) {
+            clrToken.safeTransfer(msg.sender, returnedStake);
+        }
 
         emit NodeDeregistered(msg.sender, returnedStake);
     }
 
-    function updatePrice(uint256 _newPricePerMinute) external {
+    function updatePrice(uint256 _newPricePerMinute) external whenNotPaused {
         Node storage node = nodes[msg.sender];
         require(node.isActive, "Node not registered");
         require(
@@ -264,104 +260,212 @@ contract ClearNet is Ownable, ReentrancyGuard {
         emit PaymentChannelToppedUp(msg.sender, _amount, channel.balance);
     }
 
-    /// @notice Process payment for VPN usage with signature verification
+    /// @notice Process payment for VPN usage with timestamp-based settlement
     /// @param _client Client address
     /// @param _node Node address
-    /// @param _minutesUsed Minutes of VPN usage
-    /// @param _nonce Nonce for replay protection
-    /// @param _clientSignature Client's signature
-    /// @param _nodeSignature Node's signature
-    /// @param _relaySignature Relay's signature
+    /// @param _connectionStartTime Connection start timestamp
+    /// @param _agreedPricePerMinute Price per minute agreed at connection start (off-chain)
+    /// @param _ratingProvided Whether client included a rating in their signed message
+    /// @param _rating Rating value (only checked if _ratingProvided is true)
+    /// @param _clientSignature Client's signature (must cover rating if provided)
+    /// @param _nodeSignature Node's signature (covers only core fields, not rating)
     function processPayment(
         address _client,
         address _node,
-        uint256 _minutesUsed,
-        uint256 _nonce,
+        uint256 _connectionStartTime,
+        uint256 _agreedPricePerMinute,
+        bool _ratingProvided,
+        uint256 _rating,
         bytes calldata _clientSignature,
-        bytes calldata _nodeSignature,
-        bytes calldata _relaySignature
-    ) external nonReentrant onlyRelay whenNotPaused {
-        // Prevent replay attacks and verify signatures
-        bytes32 messageHash = keccak256(abi.encodePacked(
-            _client, 
-            _node, 
-            _minutesUsed, 
-            _nonce,
-            block.chainid,
-            address(this)
-        ));
-        bytes32 ethSignedMessageHash = keccak256(abi.encodePacked(
-            "\x19Ethereum Signed Message:\n32", 
-            messageHash
-        ));
-
-        require(!usedSignatures[ethSignedMessageHash], "Signature already used");
+        bytes calldata _nodeSignature
+    ) external nonReentrant whenNotPaused {
+        // Validate addresses
+        require(_client != address(0), "Invalid client address");
+        require(_node != address(0), "Invalid node address");
+        require(_client != _node, "Client cannot be node");
         
-        // Verify all three signatures
-        require(_verifySignature(ethSignedMessageHash, _clientSignature, _client), "Invalid client signature");
-        require(_verifySignature(ethSignedMessageHash, _nodeSignature, _node), "Invalid node signature");
-        require(_verifySignature(ethSignedMessageHash, _relaySignature, msg.sender), "Invalid relay signature");
-        
-        usedSignatures[ethSignedMessageHash] = true;
-
-        // Validate inputs
-        require(_minutesUsed > 0 && _minutesUsed <= MAX_MINUTES_PER_PAYMENT, "Invalid minutes");
+        // Verify payment channel exists
+        PaymentChannel storage channel = paymentChannels[_client];
+        require(channel.isActive, "No active channel");
 
         // Verify node is active
         Node storage node = nodes[_node];
         require(node.isActive, "Node not active");
 
-        // Verify payment channel exists and has sufficient balance
-        PaymentChannel storage channel = paymentChannels[_client];
-        require(channel.isActive, "No active channel");
-        require(channel.nonce < _nonce, "Invalid nonce");
+        // Calculate duration using provided start time
+        require(_connectionStartTime > 0, "Invalid start time");
+        require(_connectionStartTime < block.timestamp, "Start time in future");
+        uint256 connectionDuration = block.timestamp - _connectionStartTime;
+        require(connectionDuration <= MAX_MINUTES_PER_PAYMENT * 60, "Session too old");
 
-        // Calculate total cost
-        uint256 totalCost = node.pricePerMinute * _minutesUsed;
+        uint256 minutesUsed = connectionDuration / 60;
+        require(minutesUsed > 0, "Duration too short");
+
+        // Validate agreed price provided by signatures
+        require(
+            _agreedPricePerMinute >= MIN_PRICE_PER_MIN && _agreedPricePerMinute <= MAX_PRICE_PER_MIN,
+            "Price out of bounds"
+        );
+
+        // Optional rating validation (0-5 inclusive)
+        if (_ratingProvided) {
+            require(_rating <= 5, "Rating out of range");
+        }
+
+        // Node signs core fields only 
+        bytes32 nodeMessageHash = keccak256(abi.encodePacked(
+            _client, 
+            _node, 
+            _connectionStartTime,
+            _agreedPricePerMinute,
+            channel.nonce,
+            block.chainid,
+            address(this)
+        ));
+        bytes32 ethNodeHash = keccak256(abi.encodePacked(
+            "\x19Ethereum Signed Message:\n32", 
+            nodeMessageHash
+        ));
+
+        // Client signs full message (including optional rating flag/value)
+        bytes32 clientMessageHash = keccak256(abi.encodePacked(
+            _client, 
+            _node, 
+            _connectionStartTime,
+            _agreedPricePerMinute,
+            channel.nonce,
+            _ratingProvided ? _rating : uint256(0),
+            _ratingProvided,
+            block.chainid,
+            address(this)
+        ));
+        bytes32 ethClientHash = keccak256(abi.encodePacked(
+            "\x19Ethereum Signed Message:\n32", 
+            clientMessageHash
+        ));
+
+        require(!usedSignatures[ethClientHash], "Signature already used");
+        
+        // Verify signatures
+        require(_verifySignature(ethClientHash, _clientSignature, _client), "Invalid client signature");
+        require(_verifySignature(ethNodeHash, _nodeSignature, _node), "Invalid node signature");
+        
+        // Mark client hash as used (prevents replay with rating variants)
+        usedSignatures[ethClientHash] = true;
+
+        // Calculate total cost using AGREED price (not current node price)
+        uint256 totalCost = _agreedPricePerMinute * minutesUsed;
         require(totalCost <= channel.balance, "Insufficient balance");
 
         // Update payment channel state
         channel.balance -= totalCost;
-        channel.nonce = _nonce;
+        channel.nonce++;
 
-        // Calculate distribution (85-10-5)
+        // Calculate distribution (90-10, with remainder going to treasury)
         uint256 nodeShare = (totalCost * NODE_SHARE) / SHARE_DENOMINATOR;
-        uint256 treasuryShare = (totalCost * TREASURY_SHARE) / SHARE_DENOMINATOR;
-        uint256 relayShare = (totalCost * RELAY_SHARE) / SHARE_DENOMINATOR;
+        uint256 treasuryShare = totalCost - nodeShare; // Ensures all funds are accounted for
 
         // Update node statistics
-        node.totalMinutesServed += _minutesUsed;
+        node.totalMinutesServed += minutesUsed;
         node.totalEarnings += nodeShare;
         
-        // Increase reputation (scaled)
-        if (node.reputationScore < MAX_REPUTATION) {
-            node.reputationScore = min(node.reputationScore + REPUTATION_INCREMENT, MAX_REPUTATION);
+        // Update reputation based on rating (weighted by connection duration)
+        // Formula: reputationDelta = (rating - 3.0) * durationWeight * REPUTATION_PRECISION
+        // where durationWeight = min(minutesUsed / 60, 1.0)
+        // This means longer connections have more impact on reputation
+        if (_ratingProvided) {
+            // Calculate duration weight (capped at 60 minutes = 1.0)
+            uint256 durationWeight = minutesUsed >= 60 ? 1000 : (minutesUsed * 1000) / 60;
+            
+            // Map rating (0-5) to delta (-3.0 to +2.0)
+            // rating=0: delta=-3000, rating=3.0: delta=0, rating=5: delta=2000 (scaled)
+            int256 ratingDelta = int256(_rating) * 500 - 1500; // (rating * 500 - 1500)
+            
+            // Apply duration weight: delta = ratingDelta * durationWeight / 1000
+            int256 weightedDelta = (ratingDelta * int256(durationWeight)) / 1000;
+            
+            // Apply to reputation with bounds checking
+            int256 newReputation = int256(node.reputationScore) + weightedDelta;
+            node.reputationScore = _clampReputation(newReputation);
         }
+        // If no rating provided: reputation stays unchanged
+        
         node.lastActivity = block.timestamp;
 
         // Update protocol statistics
-        totalBandwidthMinutes += _minutesUsed;
+        totalBandwidthMinutes += minutesUsed;
         totalProtocolFees += treasuryShare;
 
         // Transfer funds
-        clrToken.safeTransfer(_node, nodeShare);        // 85.0% to node
-        clrToken.safeTransfer(msg.sender, relayShare);  // 5.0% to relay
+        clrToken.safeTransfer(_node, nodeShare);        // 90.0% to node
         // Treasury share remains in contract for governance use
 
         emit PaymentProcessed(
             _client, 
             _node, 
             totalCost, 
-            _minutesUsed,
+            minutesUsed,
             nodeShare,
             treasuryShare,
-            relayShare
+            _ratingProvided,
+            _ratingProvided ? _rating : 0
         );
 
         emit ReputationUpdated(_node, node.reputationScore);
-    }   
+    }
 
-    function closePaymentChannel() external nonReentrant {
+    /// @notice Abort a connection within the abort window without payment
+    /// @param _connectionStartTime Connection start timestamp
+    /// @param _clientSignature Client's signature
+    function abortConnection(
+        uint256 _connectionStartTime,
+        bytes calldata _clientSignature
+    ) external nonReentrant whenNotPaused {
+        address _client = msg.sender;
+        
+        // Verify payment channel exists
+        PaymentChannel storage channel = paymentChannels[_client];
+        require(channel.isActive, "No active channel");
+        require(channel.balance > 0, "Insufficient channel balance");
+
+        require(_connectionStartTime > 0, "Invalid start time");
+        require(_connectionStartTime < block.timestamp, "Start time in future");
+
+        // Only allow abort within ABORT_WINDOW (2 minutes)
+        require(
+            block.timestamp - _connectionStartTime <= ABORT_WINDOW,
+            "Abort window expired"
+        );
+
+        // Create message hash for signature verification
+        bytes32 messageHash = keccak256(abi.encodePacked(
+            _client,
+            _connectionStartTime,
+            channel.nonce,
+            "ABORT",
+            block.chainid,
+            address(this)
+        ));
+        bytes32 ethSignedMessageHash = keccak256(abi.encodePacked(
+            "\x19Ethereum Signed Message:\n32",
+            messageHash
+        ));
+
+        require(!usedSignatures[ethSignedMessageHash], "Signature already used");
+        require(
+            _verifySignature(ethSignedMessageHash, _clientSignature, _client),
+            "Invalid client signature"
+        );
+
+        usedSignatures[ethSignedMessageHash] = true;
+
+        // Increment nonce without charging
+        channel.nonce++;
+
+        emit ConnectionAborted(_client, _connectionStartTime, block.timestamp);
+    }
+
+    function closePaymentChannel() external nonReentrant whenNotPaused {
         PaymentChannel storage channel = paymentChannels[msg.sender];
         require(channel.isActive, "Channel not active");
 
@@ -378,25 +482,6 @@ contract ClearNet is Ownable, ReentrancyGuard {
         }
 
         emit PaymentChannelClosed(msg.sender, refundAmount);
-    }
-
-    // ========= RELAY MANAGEMENT ==========
-    
-    /// @notice Add a relay operator
-    /// @param _relay Address of the relay operator
-    function addRelayOperator(address _relay) external onlyOwner {
-        require(_relay != address(0), "Invalid relay address");
-        require(!relayOperators[_relay], "Relay already added");
-        relayOperators[_relay] = true;
-        emit RelayOperatorAdded(_relay);
-    }
-
-    /// @notice Remove a relay operator
-    /// @param _relay Address of the relay operator
-    function removeRelayOperator(address _relay) external onlyOwner {
-        require(relayOperators[_relay], "Relay not found");
-        relayOperators[_relay] = false;
-        emit RelayOperatorRemoved(_relay);
     }
 
     // ========== GOVERNANCE INTEGRATION ==========
@@ -420,8 +505,9 @@ contract ClearNet is Ownable, ReentrancyGuard {
     }
 
     function withdrawTreasuryFunds(uint256 _amount) external onlyGovernance nonReentrant {
+        require(_amount > 0, "Amount must be greater than zero");
         require(_amount <= totalProtocolFees, "Insufficient treasury balance");
-        require(_amount <= clrToken.balanceOf(address(this)), "Insufficient contract balance");
+        require(governanceContract != address(0), "Governance address not set");
 
         totalProtocolFees -= _amount; // Update protocol fees
         clrToken.safeTransfer(governanceContract, _amount);
@@ -435,7 +521,7 @@ contract ClearNet is Ownable, ReentrancyGuard {
     function updateReputation(
       address _nodeID, 
       bool _successfulSession
-    ) external onlyRelay {
+    ) external onlyOwner {
         Node storage node = nodes[_nodeID];
         require(node.isActive, "Node not active");
 
@@ -473,12 +559,13 @@ contract ClearNet is Ownable, ReentrancyGuard {
 
         // If stake falls below minimum threshold, deregister node
         if (node.stakeAmount < MIN_STAKE_THRESHOLD) {
-            uint256 remainingStake = node.stakeAmount;
+            // Remaining stake is forfeited to treasury (already added to totalProtocolFees above)
+            totalProtocolFees += node.stakeAmount;
             node.isActive = false;
             node.stakeAmount = 0;
             
             _removeFromActiveNodes(_nodeID);
-            emit NodeDeregistered(_nodeID, remainingStake);
+            emit NodeDeregistered(_nodeID, 0); // 0 stake returned due to slashing
         }
     }
 
@@ -515,13 +602,6 @@ contract ClearNet is Ownable, ReentrancyGuard {
         Node storage node = nodes[_nodeID];
         require(node.isActive, "Node not active");
         return node.pricePerMinute * _minutesUsed;
-    }
-
-    /// @notice Check if address is a relay operator
-    /// @param _address Address to check
-    /// @return bool True if address is relay operator
-    function isRelayOperator(address _address) external view returns (bool) {
-        return relayOperators[_address];
     }
 
     /// @notice Get payment channel information
@@ -656,7 +736,10 @@ contract ClearNet is Ownable, ReentrancyGuard {
     /// @notice Remove node from active nodes array efficiently (O(1))
     /// @param _nodeID Node address to remove
     function _removeFromActiveNodes(address _nodeID) internal {
+        require(activeNodeIds.length > 0, "Active nodes array is empty");
         uint256 index = activeNodeIndex[_nodeID];
+        require(index < activeNodeIds.length, "Node index out of bounds");
+        
         uint256 lastIndex = activeNodeIds.length - 1;
         
         if (index != lastIndex) {
@@ -672,7 +755,10 @@ contract ClearNet is Ownable, ReentrancyGuard {
     /// @notice Remove channel from active channels array efficiently (O(1))
     /// @param _client Client address to remove
     function _removeFromActiveChannels(address _client) internal {
+        require(activeChannelIds.length > 0, "Active channels array is empty");
         uint256 index = activeChannelIndex[_client];
+        require(index < activeChannelIds.length, "Channel index out of bounds");
+        
         uint256 lastIndex = activeChannelIds.length - 1;
         
         if (index != lastIndex) {
@@ -691,5 +777,46 @@ contract ClearNet is Ownable, ReentrancyGuard {
 
     function max(uint256 a, uint256 b) internal pure returns (uint256) {
         return a > b ? a : b;
+    }
+
+    /// @notice Clamp reputation value to valid bounds [0, MAX_REPUTATION]
+    /// @param value Reputation value (may be negative or exceed max)
+    /// @return Clamped reputation score
+    function _clampReputation(int256 value) internal pure returns (uint256) {
+        if (value > int256(MAX_REPUTATION)) {
+            return MAX_REPUTATION;
+        } else if (value < 0) {
+            return 0;
+        } else {
+            return uint256(value);
+        }
+    }
+
+    // ========== ADDITIONAL VIEW FUNCTIONS ==========
+    
+    /// @notice Check if a specific signature has been used
+    /// @param _messageHash The message hash to check
+    /// @return bool Whether the signature has been used
+    function isSignatureUsed(bytes32 _messageHash) external view returns (bool) {
+        return usedSignatures[_messageHash];
+    }
+
+    /// @notice Get contract statistics
+    /// @return totalNodes Total number of active nodes
+    /// @return totalChannels Total number of active channels
+    /// @return totalMinutes Total bandwidth minutes served
+    /// @return treasuryBalance Total protocol fees collected
+    function getContractStats() external view returns (
+        uint256 totalNodes,
+        uint256 totalChannels,
+        uint256 totalMinutes,
+        uint256 treasuryBalance
+    ) {
+        return (
+            activeNodeIds.length,
+            activeChannelIds.length,
+            totalBandwidthMinutes,
+            totalProtocolFees
+        );
     }
 }
