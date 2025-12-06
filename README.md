@@ -54,7 +54,7 @@ pnpm hardhat compile
 ```
 
 This will:
-- Compile Solidity contracts to rtifacts/ directory
+- Compile Solidity contracts to artifacts/ directory
 - Generate TypeScript bindings
 - Check for compilation errors
 
