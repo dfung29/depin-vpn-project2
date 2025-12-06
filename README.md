@@ -10,6 +10,16 @@ ClearNet is a blockchain-based VPN network where:
 - **Reputation system** tracks node quality through client ratings
 - **On-chain transparency** ensures fair fee distribution (90% node / 5% treasury / 5% maintenance)
 
+
+## Deployed Contracts (Sepolia Testnet)
+
+| Contract | Address | Etherscan |
+|----------|---------|-----------|
+| CLRToken | `0xf1664c17887767c8f58695846babb349ca61d2e9` | [View](https://sepolia.etherscan.io/address/0xf1664c17887767c8f58695846babb349ca61d2e9) |
+| ClearNet | `0x0305e95225f65db13e98c775dbb95b98178ae73b` | [View](https://sepolia.etherscan.io/address/0x0305e95225f65db13e98c775dbb95b98178ae73b) |
+| CLRFaucet | `0xA86b97D7CF0c00cd0e82bBDCe9F06d689cFb12b5` | [View](https://sepolia.etherscan.io/address/0xA86b97D7CF0c00cd0e82bBDCe9F06d689cFb12b5) |
+
+
 ## Contracts
 
 - **ClearNet.sol** - Main contract for node registry, payment channels, and reputation
@@ -283,14 +293,6 @@ In another terminal, deploy to local network:
 ```powershell
 pnpm hardhat run scripts/deploy-clearnet.ts --network localhost
 ```
-
-## Deployed Contracts (Sepolia Testnet)
-
-| Contract | Address | Etherscan |
-|----------|---------|-----------|
-| CLRToken | `0xf1664c17887767c8f58695846babb349ca61d2e9` | [View](https://sepolia.etherscan.io/address/0xf1664c17887767c8f58695846babb349ca61d2e9) |
-| ClearNet | `0x0305e95225f65db13e98c775dbb95b98178ae73b` | [View](https://sepolia.etherscan.io/address/0x0305e95225f65db13e98c775dbb95b98178ae73b) |
-| CLRFaucet | `0xA86b97D7CF0c00cd0e82bBDCe9F06d689cFb12b5` | [View](https://sepolia.etherscan.io/address/0xA86b97D7CF0c00cd0e82bBDCe9F06d689cFb12b5) |
 
 ## Resources
 
