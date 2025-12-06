@@ -18,7 +18,7 @@ ClearNet is a blockchain-based VPN network where:
 
 ## Prerequisites
 
-- Node.js 18+ and npm/yarn
+- Node.js 18+ and pnpm
 - An Ethereum wallet with private key
 - Sepolia testnet ETH (for deployment) - [Get from faucet](https://sepoliafaucet.com/)
 - Alchemy/Infura RPC endpoint (or other Sepolia provider)
@@ -31,7 +31,7 @@ git clone https://github.com/dfung29/depin-vpn-project2.git
 cd depin-vpn-project2
 
 # Install dependencies
-npm install
+pnpm install
 ```
 
 ## Configuration
@@ -50,7 +50,7 @@ SEPOLIA_PRIVATE_KEY=0xYOUR_PRIVATE_KEY_HERE
 Compile all contracts:
 
 ```powershell
-npx hardhat compile
+pnpm hardhat compile
 ```
 
 This will:
@@ -61,8 +61,8 @@ This will:
 To clean and recompile:
 
 ```powershell
-npx hardhat clean
-npx hardhat compile
+pnpm hardhat clean
+pnpm hardhat compile
 ```
 
 ## Testing
@@ -71,16 +71,16 @@ Run the comprehensive test suite:
 
 ```powershell
 # Run all tests
-npx hardhat test
+pnpm hardhat test
 
 # Run specific test file
-npx hardhat test test/ClearNet.test.js
+pnpm hardhat test test/ClearNet.test.js
 
 # Run with gas reporting
-$env:REPORT_GAS='true'; npx hardhat test
+$env:REPORT_GAS='true'; pnpm hardhat test
 
 # Run with coverage
-npx hardhat coverage
+pnpm hardhat coverage
 ```
 
 ## Deployment
@@ -90,7 +90,7 @@ npx hardhat coverage
 The CLR token must be deployed first. If you haven't already deployed it, you can use Hardhat console:
 
 ```powershell
-npx hardhat console --network sepolia
+pnpm hardhat console --network sepolia
 ```
 
 In the console:
@@ -167,7 +167,7 @@ main().catch((error) => {
 Run the deployment:
 
 ```powershell
-npx hardhat run scripts/deploy-clearnet.ts --network sepolia
+pnpm hardhat run scripts/deploy-clearnet.ts --network sepolia
 ```
 
 ### Step 3: Deploy CLRFaucet (Optional - for testing)
@@ -175,7 +175,7 @@ npx hardhat run scripts/deploy-clearnet.ts --network sepolia
 Deploy the faucet to distribute test tokens:
 
 ```powershell
-npx hardhat run scripts/deploy-faucet.ts --network sepolia
+pnpm hardhat run scripts/deploy-faucet.ts --network sepolia
 ```
 
 Then fund the faucet by transferring CLR tokens to its address.
@@ -186,13 +186,13 @@ Verify contracts on Etherscan for transparency:
 
 ```powershell
 # Verify ClearNet (pass CLRToken address as constructor argument)
-npx hardhat verify --network sepolia YOUR_CLEARNET_ADDRESS "YOUR_CLR_TOKEN_ADDRESS"
+pnpm hardhat verify --network sepolia YOUR_CLEARNET_ADDRESS "YOUR_CLR_TOKEN_ADDRESS"
 
 # Verify CLRFaucet
-npx hardhat verify --network sepolia YOUR_FAUCET_ADDRESS "YOUR_CLR_TOKEN_ADDRESS"
+pnpm hardhat verify --network sepolia YOUR_FAUCET_ADDRESS "YOUR_CLR_TOKEN_ADDRESS"
 
 # Verify CLRToken (no constructor args)
-npx hardhat verify --network sepolia YOUR_TOKEN_ADDRESS
+pnpm hardhat verify --network sepolia YOUR_TOKEN_ADDRESS
 ```
 
 ## Post-Deployment Setup
@@ -203,7 +203,7 @@ npx hardhat verify --network sepolia YOUR_TOKEN_ADDRESS
 2. **Approve ClearNet contract** to spend your tokens
 3. **Register your node** with IP, port, and price-per-minute:
    ```powershell
-   npx hardhat run scripts/register-node.ts --network sepolia
+   pnpm hardhat run scripts/register-node.ts --network sepolia
    ```
 4. **Start your VPN server** software
 
@@ -275,13 +275,13 @@ depin-vpn-project2/
 Run a local Hardhat node:
 
 ```powershell
-npx hardhat node
+pnpm hardhat node
 ```
 
 In another terminal, deploy to local network:
 
 ```powershell
-npx hardhat run scripts/deploy-clearnet.ts --network localhost
+pnpm hardhat run scripts/deploy-clearnet.ts --network localhost
 ```
 
 ## Deployed Contracts (Sepolia Testnet)
