@@ -1,7 +1,7 @@
 {
   "clrToken": "0xf1664c17887767c8f58695846babb349ca61d2e9",
-  "clearNet": "0xb6f537b38b82d08ff3ed796754d9d85b5cfe9cb5",
-  "deploymentTime": "2025-12-04T15:23:34.892Z",
+  "clearNet": "0x0305e95225f65db13e98c775dbb95b98178ae73b",
+  "deploymentTime": "2025-12-06T02:14:03.660Z",
   "network": "sepolia",
   "deployedBy": "0xc4C55e92489a4628d6caE6074D489ED033898146",
   "note": "ClearNet redeployed with payment channel tracking, using existing CLRToken"

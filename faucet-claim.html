@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CLR Faucet Claim</title>
+  <style>
+    body { font-family: sans-serif; max-width: 640px; margin: 24px auto; padding: 0 16px; }
+    button { padding: 10px 16px; font-size: 16px; cursor: pointer; }
+    .row { margin: 12px 0; }
+    #status { margin-top: 12px; white-space: pre-line; }
+    code { background: #f4f4f4; padding: 2px 4px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h2>CLR Faucet Claim</h2>
+  <div class="row">Network: <strong>Sepolia</strong></div>
+  <div class="row">Faucet: <code id="faucetAddr">0xA86b97D7CF0c00cd0e82bBDCe9F06d689cFb12b5</code></div>
+  <div class="row">Token: <code>0xf1664c17887767c8f58695846babb349ca61d2e9</code></div>
+
+  <div class="row">
+    <button id="connect">Connect Wallet</button>
+    <button id="claim" disabled>Claim 100 CLR</button>
+  </div>
+  <div id="status"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.1/dist/ethers.umd.min.js"></script>
+  <script>
+    // Check if ethers loaded
+    if (typeof ethers === 'undefined') {
+      document.getElementById("status").textContent = "Error: ethers.js failed to load. Check internet connection.";
+      throw new Error("ethers.js not loaded");
+    }
+
+    // ---------------------- CONFIG ----------------------
+    const FAUCET_ADDRESS = "0xA86b97D7CF0c00cd0e82bBDCe9F06d689cFb12b5"; // set your deployed faucet address
+    const FAUCET_ABI = ["function claim() external"];
+    // ----------------------------------------------------
+
+    const statusEl = document.getElementById("status");
+    const connectBtn = document.getElementById("connect");
+    const claimBtn = document.getElementById("claim");
+    document.getElementById("faucetAddr").textContent = FAUCET_ADDRESS;
+
+    function log(msg) {
+      statusEl.textContent = msg;
+    }
+
+    async function connect() {
+      if (!window.ethereum) {
+        log("Please install MetaMask.");
+        return;
+      }
+      try {
+        log("Connecting wallet...");
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const network = await provider.getNetwork();
+        if (network.chainId !== 11155111n) {
+          log("Please switch MetaMask to Sepolia.");
+          return;
+        }
+        log("Wallet connected on Sepolia.");
+        claimBtn.disabled = false;
+        return provider;
+      } catch (err) {
+        console.error(err);
+        log("Connect failed: " + (err?.message || err));
+      }
+    }
+
+    async function claim() {
+      try {
+        claimBtn.disabled = true;
+        log("Sending claim transaction...");
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        const faucet = new ethers.Contract(FAUCET_ADDRESS, FAUCET_ABI, signer);
+        const tx = await faucet.claim();
+        log("Pending tx: " + tx.hash + "\nWaiting for confirmation...");
+        await tx.wait();
+        log("✅ Claim confirmed! Tx: " + tx.hash);
+      } catch (err) {
+        console.error(err);
+        log("Claim failed: " + (err?.shortMessage || err?.message || err));
+      } finally {
+        claimBtn.disabled = false;
+      }
+    }
+
+    connectBtn.onclick = connect;
+    claimBtn.onclick = claim;
+  </script>
+</body>
+</html>

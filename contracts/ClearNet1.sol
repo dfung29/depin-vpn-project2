@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 /// @title ClearNet - P2P VPN Node Registry & Payment System
 /// @notice Handles node registry, staking, and transparent payment system
 
-contract ClearNet is Ownable, ReentrancyGuard {
+contract ClearNet1 is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // ========== STRUCTS ==========
@@ -277,7 +277,6 @@ contract ClearNet is Ownable, ReentrancyGuard {
     function processPayment(
         address _client,
         address _node,
-        string calldata vpnClientPublicKey,
         uint256 _connectionStartTime,
         uint256 _agreedPricePerMinute,
         bool _ratingProvided,
@@ -318,20 +317,46 @@ contract ClearNet is Ownable, ReentrancyGuard {
             require(_rating <= 5, "Rating out of range");
         }
 
-        // Verify and consume signatures (moved to helper to reduce stack depth)
-        string memory vpnClientPublicKeyMem = vpnClientPublicKey;
-        _verifyAndConsumeSignatures(
-            vpnClientPublicKeyMem,
-            channel,
+        // Node signs core fields only 
+        bytes32 nodeMessageHash = keccak256(abi.encodePacked(
+            _client, 
+            _node, 
             _connectionStartTime,
             _agreedPricePerMinute,
+            channel.nonce,
+            block.chainid,
+            address(this)
+        ));
+        bytes32 ethNodeHash = keccak256(abi.encodePacked(
+            "\x19Ethereum Signed Message:\n32", 
+            nodeMessageHash
+        ));
+
+        // Client signs full message (including optional rating flag/value)
+        bytes32 clientMessageHash = keccak256(abi.encodePacked(
+            _client, 
+            _node, 
+            _connectionStartTime,
+            _agreedPricePerMinute,
+            channel.nonce,
+            _ratingProvided ? _rating : uint256(0),
             _ratingProvided,
-            _rating,
-            _clientSignature,
-            _nodeSignature,
-            _client,
-            _node
-        );
+            block.chainid,
+            address(this)
+        ));
+        bytes32 ethClientHash = keccak256(abi.encodePacked(
+            "\x19Ethereum Signed Message:\n32", 
+            clientMessageHash
+        ));
+
+        require(!usedSignatures[ethClientHash], "Signature already used");
+        
+        // Verify signatures
+        require(_verifySignature(ethClientHash, _clientSignature, _client), "Invalid client signature");
+        require(_verifySignature(ethNodeHash, _nodeSignature, _node), "Invalid node signature");
+        
+        // Mark client hash as used (prevents replay with rating variants)
+        usedSignatures[ethClientHash] = true;
 
         // Calculate total cost using AGREED price (not current node price)
         uint256 totalCost = _agreedPricePerMinute * minutesUsed;
@@ -414,9 +439,7 @@ contract ClearNet is Ownable, ReentrancyGuard {
     /// @param _connectionStartTime Connection start timestamp
     /// @param _clientSignature Client's signature
     function abortConnection(
-        string calldata vpnClientPublicKey,
         uint256 _connectionStartTime,
-        uint256 _agreedPricePerMinute,
         bytes calldata _clientSignature
     ) external nonReentrant whenNotPaused {
         address _client = msg.sender;
@@ -436,12 +459,18 @@ contract ClearNet is Ownable, ReentrancyGuard {
         );
 
         // Create message hash for signature verification
-        string memory message = string.concat(uintToString(channel.nonce+1),vpnClientPublicKey,uintToString(_connectionStartTime),uintToString(_agreedPricePerMinute));
-        bytes32 ethSignedMessageHash = keccak256(bytes(string.concat(
-            "\x19Ethereum Signed Message:\n",
-            uintToString(bytes(message).length),
-            message
-        )));
+        bytes32 messageHash = keccak256(abi.encodePacked(
+            _client,
+            _connectionStartTime,
+            channel.nonce,
+            "ABORT",
+            block.chainid,
+            address(this)
+        ));
+        bytes32 ethSignedMessageHash = keccak256(abi.encodePacked(
+            "\x19Ethereum Signed Message:\n32",
+            messageHash
+        ));
 
         require(!usedSignatures[ethSignedMessageHash], "Signature already used");
         require(
@@ -587,10 +616,10 @@ contract ClearNet is Ownable, ReentrancyGuard {
     /// @notice Get paginated list of active nodes
     /// @param _offset Starting index
     /// @param _limit Number of nodes to return
-    /// @return nodeAddresses Array of node addresses
+    /// @return nodes Array of node addresses
     /// @return total Total number of active nodes
     function getActiveNodesPaginated(uint256 _offset, uint256 _limit) external view returns (
-        address[] memory nodeAddresses,
+        address[] memory nodes,
         uint256 total
     ) {
         total = activeNodeIds.length;
@@ -604,13 +633,13 @@ contract ClearNet is Ownable, ReentrancyGuard {
         }
 
         uint256 resultLength = end - _offset;
-        nodeAddresses = new address[](resultLength);
+        nodes = new address[](resultLength);
 
         for (uint256 i = 0; i < resultLength; i++) {
-            nodeAddresses[i] = activeNodeIds[_offset + i];
+            nodes[i] = activeNodeIds[_offset + i];
         }
 
-        return (nodeAddresses, total);
+        return (nodes, total);
     }
 
     /// @notice Get all active payment channels
@@ -698,45 +727,6 @@ contract ClearNet is Ownable, ReentrancyGuard {
         address recoveredSigner = ecrecover(_ethSignedMessageHash, v, r, s);
         return recoveredSigner != address(0) && recoveredSigner == _signer;
     }
-
-    /// @notice Verify node and client signatures and mark client signature as used
-    function _verifyAndConsumeSignatures(
-        string memory vpnClientPublicKey,
-        PaymentChannel storage channel,
-        uint256 _connectionStartTime,
-        uint256 _agreedPricePerMinute,
-        bool _ratingProvided,
-        uint256 _rating,
-        bytes calldata _clientSignature,
-        bytes calldata _nodeSignature,
-        address _client,
-        address _node
-    ) internal {
-        string memory nextNonce = uintToString(channel.nonce + 1);
-
-        string memory nodeMessage = string.concat(nextNonce, uintToString(_connectionStartTime), uintToString(_agreedPricePerMinute));
-        bytes32 ethNodeHash = keccak256(bytes(string.concat("\x19Ethereum Signed Message:\n", uintToString(bytes(nodeMessage).length), nodeMessage)));
-
-        string memory clientMessage = string.concat(nextNonce, vpnClientPublicKey, uintToString(_connectionStartTime), uintToString(_agreedPricePerMinute));
-        if (_ratingProvided) {
-            clientMessage = string.concat(nextNonce, vpnClientPublicKey, uintToString(_connectionStartTime), uintToString(_agreedPricePerMinute), uintToString(_rating));
-        }
-        bytes32 ethClientHash = keccak256(bytes(string.concat("\x19Ethereum Signed Message:\n", uintToString(bytes(clientMessage).length), clientMessage)));
-
-        require(!usedSignatures[ethClientHash], "Signature already used");
-        //require(_verifySignature(ethClientHash, _clientSignature, _client), "Invalid client signature");
-        //require(_verifySignature(ethNodeHash, _nodeSignature, _node), "Invalid node signature");
-
-        require(_verifySignature(ethClientHash, _clientSignature, _client),
-            string.concat("Invalid client signature: ",clientMessage,"\n",uintToString(bytes(clientMessage).length),"\n",string(abi.encodePacked(ethClientHash)))
-        );
-        require(_verifySignature(ethNodeHash, _nodeSignature, _node), 
-            
-            string.concat("Invalid client signature: ",nodeMessage,"\n",uintToString(bytes(nodeMessage).length),"\n",string(abi.encodePacked(ethNodeHash)))
-        );
-
-        usedSignatures[ethClientHash] = true;
-    }
     
     /// @notice Remove node from active nodes array efficiently (O(1))
     /// @param _nodeID Node address to remove
@@ -795,25 +785,6 @@ contract ClearNet is Ownable, ReentrancyGuard {
         } else {
             return uint256(value);
         }
-    }
-
-    function uintToString(uint256 _value) public pure returns (string memory) {
-        if (_value == 0) {
-            return "0";
-        }
-        uint256 temp = _value;
-        uint256 digits;
-        while (temp != 0) {
-            digits++;
-            temp /= 10;
-        }
-        bytes memory buffer = new bytes(digits);
-        while (_value != 0) {
-            digits--;
-            buffer[digits] = bytes1(uint8(48 + (_value % 10))); // 48 is ASCII for '0'
-            _value /= 10;
-        }
-        return string(buffer);
     }
 
     // ========== ADDITIONAL VIEW FUNCTIONS ==========
