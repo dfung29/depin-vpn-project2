@@ -20,7 +20,7 @@ ClearNet is a blockchain-based VPN network where:
 
 - Node.js 18+ and pnpm
 - An Ethereum wallet with private key
-- Sepolia testnet ETH (for deployment) - [Get from faucet](https://sepoliafaucet.com/)
+- Sepolia testnet ETH (for deployment) - [Get from faucet](https://cloud.google.com/application/web3/faucet/ethereum/sepolia)
 - Alchemy/Infura RPC endpoint (or other Sepolia provider)
 
 ## Installation
