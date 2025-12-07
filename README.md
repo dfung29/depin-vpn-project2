@@ -93,68 +93,42 @@ Tests complete in ~13ms with no external dependencies required.
 
 ## Using the Contracts
 
-The contracts are already deployed on Sepolia testnet. Here's how to interact with them:
+The contracts are already deployed on Sepolia testnet. Here's how to register as a node operator and start earning fees.
 
-## Contract Verification (Optional)
+### Registering a VPN Node
 
-Verify contracts on Etherscan for transparency:
+Use the `register-node` script to register your node on the ClearNet marketplace:
 
 ```powershell
-# Verify ClearNet (pass CLRToken address as constructor argument)
-pnpm hardhat verify --network sepolia YOUR_CLEARNET_ADDRESS "0xf1664c17887767c8f58695846babb349ca61d2e9"
-
-# Verify CLRFaucet
-pnpm hardhat verify --network sepolia YOUR_FAUCET_ADDRESS "0xf1664c17887767c8f58695846babb349ca61d2e9"
-
-# Verify CLRToken (no constructor args)
-pnpm hardhat verify --network sepolia YOUR_TOKEN_ADDRESS
+pnpm hardhat run scripts/register-node.ts --network sepolia
 ```
 
-**Note:** Verification may fail if contracts were compiled with `viaIR: true`. In that case, you can use manual verification on Etherscan or skip verification (source code is public in this repo).
+This script will:
+1. ✅ Check your CLR token balance (requires 1000 CLR minimum stake)
+2. ✅ Approve ClearNet to spend your tokens
+3. ✅ Register your node with IP, port, and price per minute
+4. ✅ Verify the registration and display your node info
 
-### For Node Operators:
+**Before running:** Update your environment variables in `.env`:
+```env
+SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY
+SEPOLIA_PRIVATE_KEY=0xYOUR_PRIVATE_KEY_HERE
+```
 
-1. **Acquire CLR tokens** from the [test faucet](https://sepolia.etherscan.io/address/0xA86b97D7CF0c00cd0e82bBDCe9F06d689cFb12b5)
+**Node Parameters** (edit in `scripts/register-node.ts`):
+- **ipAddress**: Your VPN server IP (e.g., `192.168.1.100`)
+- **port**: Port number (e.g., `8443`)
+- **pricePerMinute**: Price in CLR (e.g., `10n ** 16n` = 0.01 CLR/min)
 
-2. **Approve ClearNet contract** to spend your tokens:
-   ```javascript
-   // Using ethers.js or viem
-   await clrToken.approve(
-     "0x0305e95225f65db13e98c775dbb95b98178ae73b", // ClearNet address
-     ethers.parseEther("1000") // MIN_STAKE amount
-   );
-   ```
+### Other Useful Scripts
 
-3. **Register your node**:
-   ```javascript
-   await clearnet.registerNode(
-     "192.168.1.100",           // Your VPN server IP
-     8080,                       // Port
-     ethers.parseEther("0.01")  // Price per minute in CLR
-   );
-   ```
+```powershell
+# List all active nodes
+pnpm hardhat run scripts/list-active-nodes.ts --network sepolia
 
-4. **Start your VPN server** software and begin earning fees
-
-### For Users:
-
-1. **Acquire CLR tokens** from the [test faucet](https://sepolia.etherscan.io/address/0xA86b97D7CF0c00cd0e82bBDCe9F06d689cFb12b5)
-
-2. **Approve and open a payment channel**:
-   ```javascript
-   // Approve tokens
-   await clrToken.approve(
-     "0x0305e95225f65db13e98c775dbb95b98178ae73b",
-     ethers.parseEther("100")
-   );
-   
-   // Open channel with deposit
-   await clearnet.openChannel(ethers.parseEther("100"));
-   ```
-
-3. **Connect to available nodes** using a VPN client
-
-4. **Sessions are settled on-chain** after disconnection with cryptographic proofs
+# Mint test tokens (requires faucet ownership)
+pnpm hardhat run scripts/mint-tokens.ts --network sepolia
+```
 
 ## Key Parameters
 
