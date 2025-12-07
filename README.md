@@ -99,8 +99,9 @@ The contracts are already deployed on Sepolia testnet. Here's how to register as
 
 First, you need to acquire CLR tokens from the test faucet:
 
-1. **Start a local web server** to serve the faucet HTML file:
+1. **Navigate to the project directory** and start a local web server:
    ```powershell
+   cd C:\path\to\depin-vpn-project2
    python -m http.server 8000
    ```
 
