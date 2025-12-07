@@ -95,9 +95,21 @@ Tests complete in ~13ms with no external dependencies required.
 
 The contracts are already deployed on Sepolia testnet. Here's how to register as a node operator and start earning fees.
 
-### Registering a VPN Node
+### Step 1: Claim CLR Tokens from the Faucet
 
-Use the `register-node` script to register your node on the ClearNet marketplace:
+First, you need to acquire CLR tokens from the test faucet:
+
+1. Open the [CLR Faucet](https://dfung29.github.io/depin-vpn-project2/faucet-claim.html) in your browser
+2. Click **"Connect Wallet"** and select MetaMask
+3. Ensure MetaMask is switched to **Sepolia testnet**
+4. Click **"Claim 5000 CLR"** to receive test tokens
+5. Wait for the transaction to confirm
+
+You'll receive **5,000 CLR tokens** per claim, which is enough for registering a VPN node (requires 1,000 CLR minimum stake) with tokens left over for gas fees and testing.
+
+### Step 2: Registering a VPN Node
+
+Once you have CLR tokens, register your node on the ClearNet marketplace:
 
 ```powershell
 pnpm hardhat run scripts/register-node.ts --network sepolia
