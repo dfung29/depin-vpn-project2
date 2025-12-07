@@ -53,7 +53,7 @@ SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY
 SEPOLIA_PRIVATE_KEY=0xYOUR_PRIVATE_KEY_HERE
 ```
 
-** Security Warning:** Never commit your .env file or share your private key!
+**Security Warning:** Never commit your .env file or share your private key!
 
 ## Compilation
 
@@ -141,8 +141,8 @@ async function main() {
   const deployer = createWalletClient({ account, chain, transport: http(rpcUrl) });
   const publicClient = createPublicClient({ chain, transport: http(rpcUrl) });
 
-  // Replace with your deployed CLRToken address
-  const clrTokenAddress = "0xYOUR_CLR_TOKEN_ADDRESS";
+  // CLRToken address on Sepolia
+  const clrTokenAddress = "0xf1664c17887767c8f58695846babb349ca61d2e9";
   
   console.log(" Deploying ClearNet contract...");
   console.log(" Using CLRToken at:", clrTokenAddress);
@@ -190,20 +190,22 @@ pnpm hardhat run scripts/deploy-faucet.ts --network sepolia
 
 Then fund the faucet by transferring CLR tokens to its address.
 
-## Contract Verification
+## Contract Verification (Optional)
 
 Verify contracts on Etherscan for transparency:
 
 ```powershell
 # Verify ClearNet (pass CLRToken address as constructor argument)
-pnpm hardhat verify --network sepolia YOUR_CLEARNET_ADDRESS "YOUR_CLR_TOKEN_ADDRESS"
+pnpm hardhat verify --network sepolia YOUR_CLEARNET_ADDRESS "0xf1664c17887767c8f58695846babb349ca61d2e9"
 
 # Verify CLRFaucet
-pnpm hardhat verify --network sepolia YOUR_FAUCET_ADDRESS "YOUR_CLR_TOKEN_ADDRESS"
+pnpm hardhat verify --network sepolia YOUR_FAUCET_ADDRESS "0xf1664c17887767c8f58695846babb349ca61d2e9"
 
 # Verify CLRToken (no constructor args)
 pnpm hardhat verify --network sepolia YOUR_TOKEN_ADDRESS
 ```
+
+**Note:** Verification may fail if contracts were compiled with `viaIR: true`. In that case, you can use manual verification on Etherscan or skip verification (source code is public in this repo).
 
 ## Post-Deployment Setup
 
@@ -238,21 +240,24 @@ pnpm hardhat verify --network sepolia YOUR_TOKEN_ADDRESS
 ## Architecture
 
 ```
-                  
-   Client       ClearNet       Node     
-  (Wallet)               Contract              Operator   
-                  
-                                                       
-       1. Deposit CLR          2. Stake CLR           
-       2. Open Channel         3. Register Node       
-       3. Connect to Node      4. Earn 90% of fees   
-       4. Sign payment                                
-      
-                               
-                         
-                           CLRToken 
-                           (ERC-20) 
-                         
+┌─────────┐         ┌──────────┐         ┌──────────┐
+│ Client  │────────>│ ClearNet │<────────│   Node   │
+│ (Wallet)│         │ Contract │         │ Operator │
+└─────────┘         └──────────┘         └──────────┘
+     │                    │                     │
+     │ 1. Deposit CLR     │                     │
+     │ 2. Open Channel    │  2. Stake CLR       │
+     │                    │  3. Register Node   │
+     │ 3. Connect to Node ├────────────────────>│
+     │ 4. Sign payment    │  4. Earn 90% fees   │
+     │                    │                     │
+     └───────────┬────────┘
+                 │
+                 v
+           ┌──────────┐
+           │ CLRToken │
+           │ (ERC-20) │
+           └──────────┘
 ```
 
 ## Security Considerations

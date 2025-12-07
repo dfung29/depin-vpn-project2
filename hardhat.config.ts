@@ -1,4 +1,5 @@
 import "@nomicfoundation/hardhat-toolbox-viem";
+import "@nomicfoundation/hardhat-verify";
 import { defineConfig } from "hardhat/config";
 import * as dotenv from "dotenv";
 
@@ -7,6 +8,11 @@ dotenv.config();
 export default defineConfig({
   paths: {
     tests: "./test",
+  },
+  etherscan: {
+    apiKey: {
+      sepolia: process.env.ETHERSCAN_API_KEY || "",
+    },
   },
   solidity: {
     profiles: {
