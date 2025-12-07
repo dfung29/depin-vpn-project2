@@ -99,11 +99,21 @@ The contracts are already deployed on Sepolia testnet. Here's how to register as
 
 First, you need to acquire CLR tokens from the test faucet:
 
-1. Open the [CLR Faucet](https://dfung29.github.io/depin-vpn-project2/faucet-claim.html) in your browser
-2. Click **"Connect Wallet"** and select MetaMask
-3. Ensure MetaMask is switched to **Sepolia testnet**
-4. Click **"Claim 5000 CLR"** to receive test tokens
-5. Wait for the transaction to confirm
+1. **Start a local web server** to serve the faucet HTML file:
+   ```powershell
+   python -m http.server 8000
+   ```
+
+2. **Open the faucet** in your browser:
+   - Navigate to `http://localhost:8000/faucet-claim.html`
+
+3. Click **"Connect Wallet"** and select MetaMask
+
+4. Ensure MetaMask is switched to **Sepolia testnet**
+
+5. Click **"Claim 5000 CLR"** to receive test tokens
+
+6. Wait for the transaction to confirm
 
 You'll receive **5,000 CLR tokens** per claim, which is enough for registering a VPN node (requires 1,000 CLR minimum stake) with tokens left over for gas fees and testing.
 
