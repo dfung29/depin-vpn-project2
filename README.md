@@ -124,9 +124,9 @@ Once you have CLR tokens, register your node on the ClearNet marketplace:
 
 1. **Configure your node parameters** in `scripts/register-node.ts`:
    ```typescript
-   const ipAddress = "192.168.1.100";      // Change to your VPN server IP
+   const ipAddress = "192.168.1.100";       // Change to your VPN server IP
    const port = 8443;                       // Change to your port number
-   const pricePerMinute = 10n ** 16n;      // Change to your price (0.01 CLR per minute)
+   const pricePerMinute = 10n ** 16n;       // Change to your price (0.01 CLR per minute)
    ```
 
 2. **Run the registration script**:
@@ -150,6 +150,46 @@ SEPOLIA_PRIVATE_KEY=0xYOUR_PRIVATE_KEY_HERE
 - **ipAddress**: Your VPN server's IP address (e.g., `192.168.1.100` or public IP)
 - **port**: The port your VPN server listens on (e.g., `8443`, `1194`, `443`)
 - **pricePerMinute**: Price in wei (e.g., `10n ** 16n` = 0.01 CLR/min, `10n ** 17n` = 0.1 CLR/min)
+
+### Step 3: Opening a Payment Channel (For VPN Users)
+
+To use VPN services, you need to open a payment channel:
+
+1. **Run the open payment channel script**:
+   ```powershell
+   pnpm hardhat run scripts/open-payment-channel.ts --network sepolia
+   ```
+
+This script will:
+1. ✅ Check your CLR token balance (requires minimum 10 CLR, default is 50 CLR)
+2. ✅ Verify you don't already have an active channel
+3. ✅ Approve ClearNet to spend your tokens
+4. ✅ Open a payment channel with the specified amount
+5. ✅ Verify the channel was created successfully
+
+**Customize Channel Amount** - Edit `scripts/open-payment-channel.ts`:
+```typescript
+const channelAmount = 50n * 10n ** 18n; // 50 CLR (minimum is 10 CLR)
+```
+
+**Note**: Payment channels allow you to use VPN services. The channel balance will be used to pay for VPN usage over time.
+
+### Step 4: Closing a Payment Channel
+
+When you're done using VPN services, close your channel to get a refund:
+
+1. **Run the close payment channel script**:
+   ```powershell
+   pnpm hardhat run scripts/close-payment-channel.ts --network sepolia
+   ```
+
+This script will:
+1. ✅ Check your active payment channel status
+2. ✅ Display current channel balance
+3. ✅ Close the payment channel
+4. ✅ Refund remaining balance to your wallet
+
+**Note**: Any unused CLR tokens in your channel will be automatically refunded when you close it.
 
 ### Other Useful Scripts
 
