@@ -214,13 +214,13 @@ pnpm hardhat run scripts/mint-tokens.ts --network sepolia
 ```
 depin-vpn-project2/
  contracts/           # Solidity smart contracts
-    ClearNet.sol    # Main VPN marketplace contract
-    CLRToken.sol    # Test ERC-20 token
-    CLRFaucet.sol   # Token faucet for testing
- scripts/            # Deployment and interaction scripts
- test/               # Test suite (Node.js test runner)
- hardhat.config.ts   # Hardhat configuration
- README.md           # This file
+    ClearNet.sol      # Main VPN marketplace contract
+    CLRToken.sol      # Test ERC-20 token
+    CLRFaucet.sol     # Token faucet for testing
+ scripts/             # Deployment and interaction scripts
+ test/                # Test suite (Node.js test runner)
+ hardhat.config.ts    # Hardhat configuration
+ README.md            # This file
 ```
 
 ### Local Development
@@ -233,14 +233,17 @@ pnpm hardhat node
 
 This starts a local Ethereum instance on `http://127.0.0.1:8545` with 20 pre-funded test accounts.
 
-In another terminal, compile and interact with contracts:
+In another terminal, compile and test contracts:
 
 ```powershell
 # Compile contracts
 pnpm hardhat compile
 
-# Deploy to local network
-pnpm hardhat run scripts/deploy-clearnet.ts --network localhost
+# Run tests
+pnpm test
+
+# Interact with deployed contracts on localhost (update contract addresses in scripts)
+pnpm hardhat run scripts/register-node.ts --network localhost
 ```
 
 ## Resources
