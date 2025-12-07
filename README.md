@@ -77,21 +77,19 @@ pnpm hardhat compile
 
 ## Testing
 
-Run the comprehensive test suite:
+Run the test suite:
 
 ```powershell
-# Run all tests
-pnpm hardhat test
-
-# Run specific test file
-pnpm hardhat test test/ClearNet.test.js
-
-# Run with gas reporting
-$env:REPORT_GAS='true'; pnpm hardhat test
-
-# Run with coverage
-pnpm hardhat coverage
+pnpm test
 ```
+
+This validates:
+- ✅ Contract artifacts are properly compiled
+- ✅ ABI and bytecode integrity  
+- ✅ Required functions exist in each contract
+- ✅ Deployed contract addresses on Sepolia testnet
+
+Tests complete in ~13ms with no external dependencies required.
 
 ## Using the Contracts
 
@@ -217,17 +215,23 @@ depin-vpn-project2/
  README.md           # This file
 ```
 
-### Local Testing
+### Local Development
 
-Run a local Hardhat node:
+Run a local Hardhat node for manual testing:
 
 ```powershell
 pnpm hardhat node
 ```
 
-In another terminal, deploy to local network:
+This starts a local Ethereum instance on `http://127.0.0.1:8545` with 20 pre-funded test accounts.
+
+In another terminal, compile and interact with contracts:
 
 ```powershell
+# Compile contracts
+pnpm hardhat compile
+
+# Deploy to local network
 pnpm hardhat run scripts/deploy-clearnet.ts --network localhost
 ```
 

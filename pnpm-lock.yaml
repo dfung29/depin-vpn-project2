@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@nomicfoundation/hardhat-chai-matchers':
+        specifier: ^2.1.0
+        version: 2.1.0(@nomicfoundation/hardhat-ethers@3.1.2(ethers@6.16.0)(hardhat@3.0.16))(chai@4.5.0)(ethers@6.16.0)(hardhat@3.0.16)
       '@nomicfoundation/hardhat-ignition':
         specifier: ^3.0.5
         version: 3.0.5(@nomicfoundation/hardhat-verify@3.0.8(hardhat@3.0.16))(hardhat@3.0.16)

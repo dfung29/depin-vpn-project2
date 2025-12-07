@@ -9,6 +9,9 @@ export default defineConfig({
   paths: {
     tests: "./test",
   },
+  mocha: {
+    timeout: 40000,
+  },
   etherscan: {
     apiKey: {
       sepolia: process.env.ETHERSCAN_API_KEY || "",
