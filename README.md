@@ -122,26 +122,34 @@ You'll receive **5,000 CLR tokens** per claim, which is enough for registering a
 
 Once you have CLR tokens, register your node on the ClearNet marketplace:
 
-```powershell
-pnpm hardhat run scripts/register-node.ts --network sepolia
-```
+1. **Configure your node parameters** in `scripts/register-node.ts`:
+   ```typescript
+   const ipAddress = "192.168.1.100";      // Change to your VPN server IP
+   const port = 8443;                       // Change to your port number
+   const pricePerMinute = 10n ** 16n;      // Change to your price (0.01 CLR per minute)
+   ```
+
+2. **Run the registration script**:
+   ```powershell
+   pnpm hardhat run scripts/register-node.ts --network sepolia
+   ```
 
 This script will:
 1. ✅ Check your CLR token balance (requires 1000 CLR minimum stake)
 2. ✅ Approve ClearNet to spend your tokens
-3. ✅ Register your node with IP, port, and price per minute
+3. ✅ Register your node with your custom IP, port, and price per minute
 4. ✅ Verify the registration and display your node info
 
-**Before running:** Update your environment variables in `.env`:
+**Environment Setup** - Update your `.env` file:
 ```env
 SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY
 SEPOLIA_PRIVATE_KEY=0xYOUR_PRIVATE_KEY_HERE
 ```
 
-**Node Parameters** (edit in `scripts/register-node.ts`):
-- **ipAddress**: Your VPN server IP (e.g., `192.168.1.100`)
-- **port**: Port number (e.g., `8443`)
-- **pricePerMinute**: Price in CLR (e.g., `10n ** 16n` = 0.01 CLR/min)
+**Parameter Guide**:
+- **ipAddress**: Your VPN server's IP address (e.g., `192.168.1.100` or public IP)
+- **port**: The port your VPN server listens on (e.g., `8443`, `1194`, `443`)
+- **pricePerMinute**: Price in wei (e.g., `10n ** 16n` = 0.01 CLR/min, `10n ** 17n` = 0.1 CLR/min)
 
 ### Other Useful Scripts
 
