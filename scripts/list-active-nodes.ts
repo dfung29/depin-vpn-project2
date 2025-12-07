@@ -17,7 +17,7 @@ async function main() {
   const publicClient = createPublicClient({ chain: sepolia, transport: http(rpcUrl) });
   const clearNetArtifact = await hre.artifacts.readArtifact("ClearNet");
 
-  const clearNetAddress = "0xb6f537b38b82d08ff3ed796754d9d85b5cfe9cb5" as `0x${string}`;
+  const clearNetAddress = "0x0305e95225f65db13e98c775dbb95b98178ae73b" as `0x${string}`;
   const yourAddress = "0xc4C55e92489a4628d6caE6074D489ED033898146" as `0x${string}`;
 
   console.log("=== Checking Registered Node ===");

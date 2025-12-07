@@ -157,6 +157,9 @@ SEPOLIA_PRIVATE_KEY=0xYOUR_PRIVATE_KEY_HERE
 # List all active nodes
 pnpm hardhat run scripts/list-active-nodes.ts --network sepolia
 
+# Deregister your node (removes from marketplace and returns staked CLR)
+pnpm hardhat run scripts/deregister-node.ts --network sepolia
+
 # Mint test tokens (requires faucet ownership)
 pnpm hardhat run scripts/mint-tokens.ts --network sepolia
 ```
