@@ -93,102 +93,9 @@ $env:REPORT_GAS='true'; pnpm hardhat test
 pnpm hardhat coverage
 ```
 
-## Deployment
+## Using the Contracts
 
-### Step 1: Deploy CLRToken (Test Token)
-
-The CLR token must be deployed first. If you haven't already deployed it, you can use Hardhat console:
-
-```powershell
-pnpm hardhat console --network sepolia
-```
-
-In the console:
-```javascript
-const CLRToken = await ethers.getContractFactory("CLRToken");
-const token = await CLRToken.deploy();
-await token.waitForDeployment();
-const tokenAddress = await token.getAddress();
-console.log("CLRToken deployed to:", tokenAddress);
-```
-
-### Step 2: Deploy ClearNet Contract
-
-Create a deployment script scripts/deploy-clearnet.ts:
-
-```typescript
-import hre from "hardhat";
-import { createWalletClient, createPublicClient, http } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
-import { defineChain } from "viem";
-
-async function main() {
-  const rpcUrl = process.env.SEPOLIA_RPC_URL!;
-  const pk = process.env.SEPOLIA_PRIVATE_KEY!;
-  
-  if (!rpcUrl || !pk) {
-    throw new Error("Missing SEPOLIA_RPC_URL or SEPOLIA_PRIVATE_KEY in .env");
-  }
-
-  const account = privateKeyToAccount(pk as `0x${string}`);
-  const chain = defineChain({
-    id: 11155111,
-    name: "sepolia",
-    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-    rpcUrls: { default: { http: [rpcUrl] } },
-  });
-  
-  const deployer = createWalletClient({ account, chain, transport: http(rpcUrl) });
-  const publicClient = createPublicClient({ chain, transport: http(rpcUrl) });
-
-  // CLRToken address on Sepolia
-  const clrTokenAddress = "0xf1664c17887767c8f58695846babb349ca61d2e9";
-  
-  console.log(" Deploying ClearNet contract...");
-  console.log(" Using CLRToken at:", clrTokenAddress);
-  console.log(" Deployer:", account.address);
-  
-  const clearnetArtifact = await hre.artifacts.readArtifact("ClearNet");
-  
-  const hash = await deployer.deployContract({
-    abi: clearnetArtifact.abi,
-    bytecode: clearnetArtifact.bytecode as `0x${string}`,
-    args: [clrTokenAddress],
-  });
-
-  console.log(" Waiting for deployment transaction:", hash);
-  const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  
-  console.log("\n ClearNet deployed successfully!");
-  console.log(" Contract address:", receipt.contractAddress);
-  console.log(" Etherscan:", `https://sepolia.etherscan.io/address/${receipt.contractAddress}`);
-  console.log("\n Next Steps:");
-  console.log("1. Verify the contract on Etherscan");
-  console.log("2. Node operators can stake CLR and register");
-  console.log("3. Users can open payment channels");
-}
-
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
-```
-
-Run the deployment:
-
-```powershell
-pnpm hardhat run scripts/deploy-clearnet.ts --network sepolia
-```
-
-### Step 3: Deploy CLRFaucet (Optional - for testing)
-
-Deploy the faucet to distribute test tokens:
-
-```powershell
-pnpm hardhat run scripts/deploy-faucet.ts --network sepolia
-```
-
-Then fund the faucet by transferring CLR tokens to its address.
+The contracts are already deployed on Sepolia testnet. Here's how to interact with them:
 
 ## Contract Verification (Optional)
 
@@ -207,23 +114,48 @@ pnpm hardhat verify --network sepolia YOUR_TOKEN_ADDRESS
 
 **Note:** Verification may fail if contracts were compiled with `viaIR: true`. In that case, you can use manual verification on Etherscan or skip verification (source code is public in this repo).
 
-## Post-Deployment Setup
-
 ### For Node Operators:
 
-1. **Acquire CLR tokens** (from faucet or exchange)
-2. **Approve ClearNet contract** to spend your tokens
-3. **Register your node** with IP, port, and price-per-minute:
-   ```powershell
-   pnpm hardhat run scripts/register-node.ts --network sepolia
+1. **Acquire CLR tokens** from the [test faucet](https://sepolia.etherscan.io/address/0xA86b97D7CF0c00cd0e82bBDCe9F06d689cFb12b5)
+
+2. **Approve ClearNet contract** to spend your tokens:
+   ```javascript
+   // Using ethers.js or viem
+   await clrToken.approve(
+     "0x0305e95225f65db13e98c775dbb95b98178ae73b", // ClearNet address
+     ethers.parseEther("1000") // MIN_STAKE amount
+   );
    ```
-4. **Start your VPN server** software
+
+3. **Register your node**:
+   ```javascript
+   await clearnet.registerNode(
+     "192.168.1.100",           // Your VPN server IP
+     8080,                       // Port
+     ethers.parseEther("0.01")  // Price per minute in CLR
+   );
+   ```
+
+4. **Start your VPN server** software and begin earning fees
 
 ### For Users:
 
-1. **Acquire CLR tokens** from the faucet
-2. **Open a payment channel** by depositing tokens into ClearNet
+1. **Acquire CLR tokens** from the [test faucet](https://sepolia.etherscan.io/address/0xA86b97D7CF0c00cd0e82bBDCe9F06d689cFb12b5)
+
+2. **Approve and open a payment channel**:
+   ```javascript
+   // Approve tokens
+   await clrToken.approve(
+     "0x0305e95225f65db13e98c775dbb95b98178ae73b",
+     ethers.parseEther("100")
+   );
+   
+   // Open channel with deposit
+   await clearnet.openChannel(ethers.parseEther("100"));
+   ```
+
 3. **Connect to available nodes** using a VPN client
+
 4. **Sessions are settled on-chain** after disconnection with cryptographic proofs
 
 ## Key Parameters
