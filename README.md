@@ -173,13 +173,6 @@ SEPOLIA_PRIVATE_KEY=0xYOUR_PRIVATE_KEY_HERE
 - **port**: The port your VPN server listens on (e.g., `8443`, `1194`, `443`)
 - **pricePerMinute**: Price in wei (e.g., `10n ** 16n` = 0.01 CLR/min, `10n ** 17n` = 0.1 CLR/min)
 
-**Verify on Client Interface**:
-After registration, you can view your node on the [ClearNet Client](http://depin.msbd.cloud/):
-1. Open [http://depin.msbd.cloud/](http://depin.msbd.cloud/)
-2. Click "Login" and connect your MetaMask wallet
-3. Ensure MetaMask is on Sepolia network
-4. Your registered node should appear on the home page under "Available Servers"
-
 ### Step 2: Verify Your Node is Registered
 
 Check that your node appears in the active nodes list:
@@ -194,6 +187,13 @@ This will display all currently active nodes with their:
 - Price per minute
 - Reputation score
 - Total minutes served and earnings
+
+**Verify on Client Interface**:
+After registration, you can view your node on the [ClearNet Client](http://depin.msbd.cloud/):
+1. Open [http://depin.msbd.cloud/](http://depin.msbd.cloud/)
+2. Click "Login" and connect your MetaMask wallet
+3. Ensure MetaMask is on Sepolia network
+4. Your registered node should appear on the home page under "Available Servers"
 
 ### Step 3: Deregister Your Node (When Done)
 
