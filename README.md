@@ -19,6 +19,8 @@ ClearNet is a blockchain-based VPN network where:
 | ClearNet | `0x0305e95225f65db13e98c775dbb95b98178ae73b` | [View](https://sepolia.etherscan.io/address/0x0305e95225f65db13e98c775dbb95b98178ae73b) |
 | CLRFaucet | `0xA86b97D7CF0c00cd0e82bBDCe9F06d689cFb12b5` | [View](https://sepolia.etherscan.io/address/0xA86b97D7CF0c00cd0e82bBDCe9F06d689cFb12b5) |
 
+**View Available Nodes**: [http://depin.msbd.cloud/](http://depin.msbd.cloud/) - Client interface showing all active VPN nodes connected to the smart contract.
+
 
 ## Contracts
 
@@ -170,6 +172,13 @@ SEPOLIA_PRIVATE_KEY=0xYOUR_PRIVATE_KEY_HERE
 - **ipAddress**: Your VPN server's IP address (e.g., `192.168.1.100` or public IP)
 - **port**: The port your VPN server listens on (e.g., `8443`, `1194`, `443`)
 - **pricePerMinute**: Price in wei (e.g., `10n ** 16n` = 0.01 CLR/min, `10n ** 17n` = 0.1 CLR/min)
+
+**Verify on Client Interface**:
+After registration, you can view your node on the [ClearNet Client](http://depin.msbd.cloud/):
+1. Open [http://depin.msbd.cloud/](http://depin.msbd.cloud/)
+2. Click "Login" and connect your MetaMask wallet
+3. Ensure MetaMask is on Sepolia network
+4. Your registered node should appear on the home page under "Available Servers"
 
 ### Step 2: Verify Your Node is Registered
 
