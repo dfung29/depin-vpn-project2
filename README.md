@@ -83,21 +83,35 @@ Run the test suite:
 pnpm test
 ```
 
-This validates:
-- ✅ Contract artifacts are properly compiled
-- ✅ ABI and bytecode integrity  
-- ✅ Required functions exist in each contract
-- ✅ Deployed contract addresses on Sepolia testnet
+**What the Tests Do**:
 
-Tests complete in ~13ms with no external dependencies required.
+The test suite validates your compiled smart contracts without needing to run a blockchain or deploy contracts:
+
+1. **Artifact Validation** - Confirms compiled JSON files exist for all three contracts (CLRToken, ClearNet, CLRFaucet)
+2. **JSON Structure** - Ensures artifacts are valid JSON and can be parsed
+3. **Bytecode Verification** - Checks that contracts have compiled bytecode (proof of successful compilation)
+4. **ABI Structure** - Validates that the Application Binary Interface (ABI) exists and contains function definitions
+5. **Required Functions** - Verifies that each contract has all expected functions:
+   - **CLRToken**: `mint`, `approve`, `transfer`, `balanceOf`
+   - **ClearNet**: `registerNode`, `openPaymentChannel`, `getActiveNodes`, `calculateCost`, `getPaymentChannelInfo`, `getContractStats`
+6. **Deployment Validation** - Confirms Sepolia testnet addresses are properly formatted
+7. **Contract Structure** - Ensures all contracts have required properties (abi, bytecode, contractName)
+
+**Why This Approach?**
+- ⚡ Fast: Tests complete in ~13ms with no external dependencies
+- 🔧 Reliable: Catches compilation issues, missing functions, or structural problems early
+- 📦 Lightweight: No need to run Hardhat node or deploy contracts to validate
+- ✅ Comprehensive: Validates contract integrity before mainnet interaction
+
+Tests complete in ~13ms with no blockchain dependencies required.
 
 ## Using the Contracts
 
-The contracts are already deployed on Sepolia testnet. Here's how to register as a node operator and start earning fees.
+The contracts are already deployed on Sepolia testnet. Choose your role below to get started.
 
-### Step 1: Claim CLR Tokens from the Faucet
+### Prerequisites: Claim CLR Tokens from the Faucet
 
-First, you need to acquire CLR tokens from the test faucet:
+Before you can use any contract functionality, you need to acquire CLR tokens:
 
 1. **Navigate to the project directory** and start a local web server:
    ```powershell
@@ -116,11 +130,17 @@ First, you need to acquire CLR tokens from the test faucet:
 
 6. Wait for the transaction to confirm
 
-You'll receive **5,000 CLR tokens** per claim, which is enough for registering a VPN node (requires 1,000 CLR minimum stake) with tokens left over for gas fees and testing.
+You'll receive **5,000 CLR tokens** per claim. This is enough for either registering a VPN node (1,000 CLR minimum) or opening a payment channel (10 CLR minimum) with tokens left over for gas fees.
 
-### Step 2: Registering a VPN Node
+---
 
-Once you have CLR tokens, register your node on the ClearNet marketplace:
+## For Node Providers
+
+If you want to provide VPN services and earn CLR tokens from users.
+
+### Step 1: Register Your VPN Node
+
+Register your node on the ClearNet marketplace:
 
 1. **Configure your node parameters** in `scripts/register-node.ts`:
    ```typescript
@@ -151,7 +171,42 @@ SEPOLIA_PRIVATE_KEY=0xYOUR_PRIVATE_KEY_HERE
 - **port**: The port your VPN server listens on (e.g., `8443`, `1194`, `443`)
 - **pricePerMinute**: Price in wei (e.g., `10n ** 16n` = 0.01 CLR/min, `10n ** 17n` = 0.1 CLR/min)
 
-### Step 3: Opening a Payment Channel (For VPN Users)
+### Step 2: Verify Your Node is Registered
+
+Check that your node appears in the active nodes list:
+
+```powershell
+pnpm hardhat run scripts/list-active-nodes.ts --network sepolia
+```
+
+This will display all currently active nodes with their:
+- Node owner address
+- IP address and port
+- Price per minute
+- Reputation score
+- Total minutes served and earnings
+
+### Step 3: Deregister Your Node (When Done)
+
+When you want to stop providing VPN services and recover your stake:
+
+```powershell
+pnpm hardhat run scripts/deregister-node.ts --network sepolia
+```
+
+This script will:
+1. ✅ Check your current node status
+2. ✅ Display node info and staked amount
+3. ✅ Remove your node from the marketplace
+4. ✅ Refund your staked CLR tokens to your wallet
+
+---
+
+## For VPN Users
+
+If you want to use VPN services from node providers.
+
+### Step 1: Open a Payment Channel
 
 To use VPN services, you need to open a payment channel:
 
@@ -174,14 +229,13 @@ const channelAmount = 50n * 10n ** 18n; // 50 CLR (minimum is 10 CLR)
 
 **Note**: Payment channels allow you to use VPN services. The channel balance will be used to pay for VPN usage over time.
 
-### Step 4: Closing a Payment Channel
+### Step 2: Close Your Payment Channel (When Done)
 
-When you're done using VPN services, close your channel to get a refund:
+When you're finished using VPN services, close your channel to get a refund:
 
-1. **Run the close payment channel script**:
-   ```powershell
-   pnpm hardhat run scripts/close-payment-channel.ts --network sepolia
-   ```
+```powershell
+pnpm hardhat run scripts/close-payment-channel.ts --network sepolia
+```
 
 This script will:
 1. ✅ Check your active payment channel status
@@ -191,15 +245,11 @@ This script will:
 
 **Note**: Any unused CLR tokens in your channel will be automatically refunded when you close it.
 
-### Other Useful Scripts
+---
+
+## Other Useful Scripts
 
 ```powershell
-# List all active nodes
-pnpm hardhat run scripts/list-active-nodes.ts --network sepolia
-
-# Deregister your node (removes from marketplace and returns staked CLR)
-pnpm hardhat run scripts/deregister-node.ts --network sepolia
-
 # Mint test tokens (requires faucet ownership)
 pnpm hardhat run scripts/mint-tokens.ts --network sepolia
 ```
